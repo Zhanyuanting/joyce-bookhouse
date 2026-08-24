@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Joyce's 书屋</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --primary:#ff8a65; --primary-dark:#e64a19; --bg:#fff8f5; --card:#fff;
+  --text:#3e2723; --sub:#8d6e63; --line:#f0e0d8; --tag:#ffe0b2; --green:#66bb6a;
+  --radius:14px; --shadow:0 2px 8px rgba(120,60,30,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding-bottom:80px}
+button{font-family:inherit;border:none;cursor:pointer;background:none}
+input,select,textarea{font-family:inherit;font-size:15px}
+
+/* ===== 顶部 ===== */
+header{position:sticky;top:0;z-index:50;background:linear-gradient(135deg,#ff8a65,#ff7043);color:#fff;padding:14px 16px 12px;box-shadow:var(--shadow)}
+header .h-row{display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:19px;font-weight:700}
+header .stats{font-size:12px;opacity:.9;margin-top:3px}
+.icon-btn{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(255,255,255,.2);color:#fff}
+
+/* ===== 搜索/筛选 ===== */
+.toolbar{padding:12px 14px 4px}
+.search-box{display:flex;gap:8px;margin-bottom:10px}
+.search-box input{flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:22px;background:#fff;outline:none;font-size:15px}
+.search-box input:focus{border-color:var(--primary)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:18px;background:#fff;border:1.5px solid var(--line);color:var(--sub);font-size:13px}
+.chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.filter-panel{background:var(--card);border-radius:var(--radius);padding:12px;margin:0 14px 12px;box-shadow:var(--shadow);display:none}
+.filter-panel.show{display:block}
+.filter-panel label{display:block;font-size:12px;color:var(--sub);margin:8px 0 4px}
+.filter-panel select{width:100%;padding:9px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+
+/* ===== 书籍卡片 ===== */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:4px 14px}
+@media(min-width:600px){.grid{grid-template-columns:repeat(5,1fr)}}
+.book-card{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);position:relative}
+.book-card.stored{opacity:.55}
+.cover{width:100%;aspect-ratio:3/4;background:linear-gradient(160deg,#ffe0b2,#ffcc80);display:flex;align-items:center;justify-content:center;padding:8px;text-align:center;font-size:12px;color:#795548;line-height:1.4;word-break:break-all;overflow:hidden}
+.cover img{width:100%;height:100%;object-fit:cover}
+.book-card .info{padding:7px 8px 9px}
+.book-card .t{font-size:12.5px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
+.book-card .loc{font-size:10.5px;color:var(--sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badges{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:4px}
+.badge{font-size:10px;padding:2px 7px;border-radius:9px;background:rgba(255,255,255,.92);color:var(--primary-dark);font-weight:600;max-width:80px;white-space:nowrap;overflow:hidden}
+.badge.stored-b{background:#b0bec5;color:#37474f}
+.empty{text-align:center;color:var(--sub);padding:60px 20px;font-size:14px}
+.group-title{grid-column:1/-1;font-size:13px;font-weight:700;color:var(--primary-dark);padding:10px 2px 0;border-bottom:1px dashed var(--line)}
+
+/* ===== 底部导航 ===== */
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:60}
+nav button{flex:1;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--sub);font-size:11px}
+nav button .ico{font-size:22px}
+nav button.on{color:var(--primary-dark);font-weight:600}
+#fabAdd{position:fixed;right:16px;bottom:90px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;font-size:28px;box-shadow:0 4px 14px rgba(230,74,25,.4);z-index:55;display:flex;align-items:center;justify-content:center}
+
+/* ===== 弹层 ===== */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.modal-mask.show{display:flex}
+.modal{background:#fff;width:100%;max-width:640px;border-radius:20px 20px 0 0;max-height:88vh;overflow-y:auto;padding:16px 16px 30px}
+.modal .m-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.modal .m-head h2{font-size:17px}
+.modal .close{font-size:22px;color:var(--sub);padding:4px 10px}
+.f-row{margin-bottom:12px}
+.f-row label{display:block;font-size:13px;color:var(--sub);margin-bottom:5px;font-weight:600}
+.f-row input,.f-row select,.f-row textarea{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;outline:none;background:#fff}
+.f-row input:focus,.f-row select:focus{border-color:var(--primary)}
+.btn{display:block;width:100%;padding:13px;border-radius:12px;background:var(--primary);color:#fff;font-size:16px;font-weight:600;margin-top:6px}
+.btn.sec{background:#fff;color:var(--primary-dark);border:1.5px solid var(--primary)}
+.btn.sm{padding:8px 16px;width:auto;font-size:14px;display:inline-block}
+.btn:active{opacity:.8}
+.tag-input-row{display:flex;gap:8px}
+.tag-input-row input{flex:1}
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{padding:4px 12px;border-radius:14px;background:var(--tag);color:#5d4037;font-size:13px;display:flex;align-items:center;gap:5px}
+.tag .x{color:#a1887f;font-weight:700}
+.quick-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.quick-tags button{padding:4px 11px;border-radius:12px;border:1px dashed var(--line);color:var(--sub);font-size:12px}
+
+/* ===== 扫码 ===== */
+#scannerView{display:none;background:#000;border-radius:14px;overflow:hidden;margin-bottom:12px}
+#scannerView.show{display:block}
+#reader{width:100%}
+.scan-actions{display:flex;gap:10px;margin-bottom:12px}
+.scan-actions .btn{flex:1;margin-top:0}
+#lookupStatus{font-size:13px;color:var(--sub);padding:8px 0;min-height:20px}
+
+/* ===== 书籍详情 ===== */
+.detail-head{display:flex;gap:14px}
+.detail-cover{width:110px;flex-shrink:0;aspect-ratio:3/4;border-radius:10px;overflow:hidden;background:#ffe0b2}
+.detail-cover img{width:100%;height:100%;object-fit:cover}
+.detail-meta{flex:1;font-size:13px;color:var(--sub);line-height:1.9;word-break:break-all}
+.detail-meta b{color:var(--text)}
+.detail-title{font-size:17px;color:var(--text);margin-bottom:6px;line-height:1.4}
+.records-list .r-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.r-del{color:#c62828;font-size:13px;padding:2px 8px}
+.stars-row{display:flex;gap:8px;justify-content:center;margin:14px 0}
+.stars-row button{font-size:34px;color:#d7ccc8;transition:transform .1s}
+.stars-row button.on{color:#ffb300}
+.stars-row button:active{transform:scale(1.2)}
+
+/* ===== 阅读页 ===== */
+.page-title{font-size:16px;font-weight:700;padding:14px 16px 8px}
+.stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px 12px}
+.stat-c{background:#fff;border-radius:var(--radius);padding:14px 8px;text-align:center;box-shadow:var(--shadow)}
+.stat-c .n{font-size:22px;font-weight:800;color:var(--primary-dark)}
+.stat-c .l{font-size:11px;color:var(--sub);margin-top:2px}
+#heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px 2px}
+#heatmap div{aspect-ratio:1;border-radius:4px;background:#f5ebe7}
+#heatmap div.l1{background:#ffccbc}
+#heatmap div.l2{background:#ff8a65}
+#heatmap div.l3{background:#e64a19}
+.rank-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.rank-item .rk{width:24px;height:24px;border-radius:50%;background:var(--tag);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#795548;flex-shrink:0}
+.rank-item .rk.top{background:#ffb300;color:#fff}
+.rank-item .rt{flex:1;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-item .rc{font-size:12px;color:var(--sub)}
+.section-box{background:#fff;border-radius:var(--radius);padding:12px 14px;margin:0 14px 14px;box-shadow:var(--shadow)}
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;z-index:999;display:none;max-width:80%;text-align:center}
+.tabbar{display:flex;margin-bottom:14px}
+.tabbar button{flex:1;padding:10px;font-size:14px;color:var(--sub);border-bottom:2.5px solid transparent}
+.tabbar button.on{color:var(--primary-dark);border-bottom-color:var(--primary);font-weight:700}
+.photo-pick{display:flex;gap:10px;align-items:center}
+.photo-pick .pv{width:70px;height:93px;border-radius:8px;object-fit:cover;background:#ffe0b2;flex-shrink:0}
+.recent-tag{font-size:11px;color:var(--primary-dark);background:#fff3e0;border-radius:8px;padding:2px 8px;display:inline-block;margin:2px 4px 2px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-row">
+    <div>
+      <h1>📚 Joyce's 书屋</h1>
+      <div class="stats" id="headerStats"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="icon-btn" id="btnFilter" title="筛选">⚙️</button>
+      <button class="icon-btn" id="btnMore" title="备份">⋯</button>
+    </div>
+  </div>
+</header>
+
+<!-- ================= 书架页 ================= -->
+<div id="page-shelf">
+  <div class="toolbar">
+    <div class="search-box">
+      <input id="searchInput" placeholder="搜书名 / 作者 / 标签…">
+    </div>
+    <div class="chips" id="ageChips"></div>
+  </div>
+  <div class="filter-panel" id="filterPanel">
+    <label>位置</label><select id="fLocation"><option value="">全部位置</option></select>
+    <label>状态</label>
+    <select id="fStatus"><option value="">全部状态</option><option value="shelf">在架</option><option value="stored">已收纳</option></select>
+    <label>标签</label><select id="fTag"><option value="">全部标签</option></select>
+    <label>查看方式</label>
+    <select id="fGroup">
+      <option value="">平铺展示(按录入时间)</option>
+      <option value="loc">按位置分组(按书架找书)</option>
+    </select>
+    <button class="btn sec" id="fReset" style="margin-top:12px">重置筛选</button>
+  </div>
+  <div class="grid" id="bookGrid"></div>
+  <div class="empty" id="shelfEmpty" style="display:none">还没有书哦～<br>点右下角 ➕ 扫码录入第一本绘本吧！</div>
+</div>
+
+<!-- ================= 阅读页 ================= -->
+<div id="page-read" style="display:none">
+  <div class="page-title">📖 今日共读</div>
+  <div class="section-box" style="text-align:center">
+    <div style="font-size:13px;color:var(--sub);margin-bottom:4px" id="todayDate"></div>
+    <button class="btn sm" id="btnLogToday">📕 记录今天读的书</button>
+    <div id="todayBooks" style="margin-top:10px;font-size:13px;color:var(--sub);line-height:1.8"></div>
+  </div>
+  <div class="page-title">📊 小统计</div>
+  <div class="stat-cards">
+    <div class="stat-c"><div class="n" id="stTotal">0</div><div class="l">总藏书</div></div>
+    <div class="stat-c"><div class="n" id="stRead">0</div><div class="l">共读次数</div></div>
+    <div class="stat-c"><div class="n" id="stMonth">0</div><div class="l">本月共读</div></div>
+  </div>
+  <div class="section-box">
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px">近 12 周共读热力图</div>
+    <div id="heatmap"></div>
+  </div>
+  <div class="section-box">
+    <div style="font-size:13px;color:var(--sub);margin-bottom:6px">🏆 Joyce 最爱 TOP 10</div>
+    <div id="rankList"></div>
+  </div>
+</div>
+
+<button id="fabAdd">＋</button>
+
+<nav>
+  <button class="on" data-page="shelf"><span class="ico">📚</span>书架</button>
+  <button data-page="read"><span class="ico">📖</span>阅读</button>
+</nav>
+
+<!-- ================= 录入/编辑弹层 ================= -->
+<div class="modal-mask" id="addModal">
+  <div class="modal">
+    <div class="m-head"><h2 id="addTitle">➕ 录入新书</h2><button class="close" data-close="addModal">✕</button></div>
+    <div class="tabbar">
+      <button class="on" data-tab="scan">📷 扫码录入</button>
+      <button data-tab="manual">✍️ 手动录入</button>
+    </div>
+    <div id="tab-scan">
+      <div id="scannerView"><div id="reader"></div></div>
+      <div class="scan-actions">
+        <button class="btn" id="btnStartScan">开启摄像头扫码</button>
+      </div>
+      <div style="font-size:12px;color:var(--sub);line-height:1.7;padding:4px 2px">
+        💡 扫书背面的 ISBN 条码(13位数字那串)。识别成功后会自动查询书名和封面。
+        没有条码的中文绘本/套装,请用「手动录入」。<br>
+        ⚠️ 摄像头需要在 https 网页或本地服务下才能打开;直接双击打开本地文件可能无法扫码。
+      </div>
+      <div id="lookupStatus"></div>
+    </div>
+    <div id="tab-manual" style="display:none">
+      <div class="f-row"><label>书名 *</label><input id="mTitle" placeholder="例如:好饿的毛毛虫"></div>
+      <div class="f-row"><label>作者/出版社</label><input id="mAuthor" placeholder="可选"></div>
+      <div class="f-row"><label>封面照片</label>
+        <div class="photo-pick">
+          <img class="pv" id="mCoverPreview" style="display:none">
+          <input type="file" id="mCoverFile" accept="image/*" capture="environment" style="font-size:13px">
+        </div>
+      </div>
+    </div>
+
+    <!-- 公共字段 -->
+    <div class="f-row"><label>适龄段 *</label>
+      <select id="fAge"><option value="">请选择</option></select>
+      <div class="quick-tags" id="ageQuick"></div>
+    </div>
+    <div class="f-row"><label>位置(在哪能找到它)</label>
+      <select id="fLocSel"><option value="__new">＋ 新建位置…</option></select>
+      <input id="fLocNew" placeholder="如:主卧书架2层 / 客厅柜子 / 储物间A箱" style="display:none;margin-top:8px">
+    </div>
+    <div class="f-row"><label>状态</label>
+      <select id="fStatusSel">
+        <option value="shelf">📖 在架(现在在读)</option>
+        <option value="stored">📦 已收纳(暂时收起来)</option>
+      </select>
+    </div>
+    <div class="f-row"><label>主题标签</label>
+      <div class="tag-input-row"><input id="tagInput" placeholder="输入标签后回车,或点下面的快捷标签"><button class="btn sm sec" id="tagAdd">添加</button></div>
+      <div class="quick-tags" id="tagQuick"></div>
+      <div class="tags-wrap" id="tagWrap"></div>
+    </div>
+    <div class="f-row"><label>备注</label><textarea id="mNote" rows="2" placeholder="可选,比如:套装第3册 / 借给XX了"></textarea></div>
+    <button class="btn" id="btnSave">💾 保存入库</button>
+  </div>
+</div>
+
+<!-- ================= 书籍详情弹层 ================= -->
+<div class="modal-mask" id="detailModal">
+  <div class="modal">
+    <div class="m-head"><h2>📖 书籍详情</h2><button class="close" data-close="detailModal">✕</button></div>
+    <div class="detail-head">
+      <div class="detail-cover" id="dCover"></div>
+      <div class="detail-meta">
+        <div class="detail-title" id="dTitle"></div>
+        <div id="dAuthor"></div>
+        <div id="dIsbn"></div>
+        <div id="dAge"></div>
+        <div id="dLoc"></div>
+        <div id="dStatus"></div>
+        <div class="tags-wrap" id="dTags" style="margin-top:4px"></div>
+        <div id="dNote" style="margin-top:6px;font-style:italic"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn" style="background:var(--green)" id="btnToggleStatus">📦 收纳</button>
+      <button class="btn sec" id="btnEditBook">✏️ 编辑</button>
+      <button class="btn sec" style="color:#c62828;border-color:#c62828" id="btnDelBook">🗑 删除</button>
+    </div>
+    <div class="page-title" style="padding:18px 0 0">⭐ 读过这本书</div>
+    <div class="f-row" style="margin:0 0 4px"><label style="text-align:center">共读日期(可补记往日)</label><input type="date" id="recordDate"></div>
+    <div class="stars-row" id="starRow"></div>
+    <button class="btn" id="btnAddRecord">记录一次共读</button>
+    <div class="records-list" id="bookRecords" style="margin-top:14px"></div>
+  </div>
+</div>
+
+<!-- ================= 备份弹层 ================= -->
+<div class="modal-mask" id="backupModal">
+  <div class="modal">
+    <div class="m-head"><h2>💾 备份与恢复</h2><button class="close" data-close="backupModal">✕</button></div>
+    <div style="font-size:13px;color:var(--sub);line-height:1.8;margin-bottom:14px">
+      数据都保存在这台设备的浏览器里。建议每月导出一次备份文件(JSON),换手机或误删时可以恢复。
+    </div>
+    <button class="btn" id="btnExport">📤 导出备份文件</button>
+    <button class="btn sec" id="btnImport">📥 从备份恢复</button>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= IndexedDB ================= */
+const DB_NAME='joyceBooks', DB_VER=1;
+let db;
+function openDB(){return new Promise((res,rej)=>{
+  const r=indexedDB.open(DB_NAME,DB_VER);
+  r.onupgradeneeded=e=>{
+    const d=e.target.result;
+    if(!d.objectStoreNames.contains('books')){
+      const s=d.createObjectStore('books',{keyPath:'id'});
+      s.createIndex('title','title',{unique:false});
+    }
+    if(!d.objectStoreNames.contains('records')) d.createObjectStore('records',{keyPath:'id'});
+  };
+  r.onsuccess=e=>{db=e.target.result;res(db)};
+  r.onerror=e=>rej(e);
+})}
+function tx(store,mode){return db.transaction(store,mode).objectStore(store)}
+function dbAll(store){return new Promise(res=>{const r=tx(store,'readonly').getAll();r.onsuccess=()=>res(r.result)})}
+function dbPut(store,val){return new Promise(res=>{const r=tx(store,'readwrite').put(val);r.onsuccess=()=>res(val)})}
+function dbDel(store,id){return new Promise(res=>{tx(store,'readwrite').delete(id).onsuccess=()=>res()})}
+function dbClear(store){return new Promise(res=>{tx(store,'readwrite').clear().onsuccess=()=>res()})}
+
+/* ================= 全局状态 ================= */
+let BOOKS=[], RECORDS=[];
+let filter={age:'',loc:'',status:'',tag:'',q:'',group:''};
+let editingId=null, currentDetail=null, tempTags=[], tempCover=null, pendingIsbn=null;
+const AGE_OPTIONS=['6个月+','1岁+','1.5岁+','2岁+','2.5岁+','3岁+','3.5岁+','4岁+','5岁+','成人'];
+const QUICK_TAGS=['中文','英文','双语','科普','恐龙','动物','公主','车车','情绪管理','生活习惯','故事','贴纸书','触摸书','机关书','套装','点读书'];
+
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',1800)}
+function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+
+/* ================= 数据加载与渲染 ================= */
+async function loadAll(){BOOKS=await dbAll('books');RECORDS=await dbAll('records')}
+function saveBook(b){return dbPut('books',b).then(()=>loadAll())}
+
+function renderHeader(){
+  const on=BOOKS.filter(b=>b.status==='shelf').length, st=BOOKS.length-on;
+  $('#headerStats').textContent=`共 ${BOOKS.length} 本 · 在架 ${on} · 收纳 ${st}`;
+}
+function renderChips(){
+  const ages=[...new Set(BOOKS.map(b=>b.age).filter(Boolean))];
+  const chips=['全部',...ages];
+  $('#ageChips').innerHTML=chips.map(c=>`<button class="chip ${filter.age===(c==='全部'?'':c)?'on':''}" data-age="${esc(c==='全部'?'':c)}">${esc(c)}</button>`).join('');
+  $$('#ageChips .chip').forEach(b=>b.onclick=()=>{filter.age=b.dataset.age;render()});
+}
+function renderFilters(){
+  const locs=[...new Set(BOOKS.map(b=>b.location).filter(Boolean))];
+  const tags=[...new Set(BOOKS.flatMap(b=>b.tags||[]))];
+  const fill=(sel,items,cur,allLabel)=>{sel.innerHTML=`<option value="">${allLabel}</option>`+items.map(i=>`<option ${i===cur?'selected':''}>${esc(i)}</option>`).join('')};
+  fill($('#fLocation'),locs,filter.loc,'全部位置');
+  fill($('#fTag'),tags,filter.tag,'全部标签');
+  $('#fStatus').value=filter.status;
+  $('#fGroup').value=filter.group;
+}
+function filteredBooks(){
+  return BOOKS.filter(b=>{
+    if(filter.age&&b.age!==filter.age)return false;
+    if(filter.loc&&b.location!==filter.loc)return false;
+    if(filter.status&&b.status!==filter.status)return false;
+    if(filter.tag&&!(b.tags||[]).includes(filter.tag))return false;
+    if(filter.q){
+      const q=filter.q.toLowerCase();
+      const hay=[b.title,b.author,b.isbn,...(b.tags||[]),(b.note||'')].join(' ').toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+}
+function cardHTML(b){
+  return `
+    <div class="book-card ${b.status==='stored'?'stored':''}" data-id="${b.id}">
+      <div class="badges">
+        ${b.age?`<span class="badge">${esc(b.age)}</span>`:''}
+        ${b.status==='stored'?`<span class="badge stored-b">📦收纳</span>`:''}
+      </div>
+      <div class="cover">${b.cover?`<img src="${b.cover}" loading="lazy">`:esc(b.title)}</div>
+      <div class="info"><div class="t">${esc(b.title)}</div><div class="loc">📍${esc(b.location||'未设位置')}</div></div>
+    </div>`;
+}
+function renderGrid(){
+  const list=filteredBooks();
+  $('#shelfEmpty').style.display=list.length?'none':'block';
+  let html='';
+  if(filter.group==='loc'){
+    const groups={};
+    list.forEach(b=>{const k=b.location||'未设位置';(groups[k]=groups[k]||[]).push(b)});
+    const keys=Object.keys(groups).sort((a,b)=>{
+      const na=a==='未设位置'?1:0, nb=b==='未设位置'?1:0;
+      return na-nb||a.localeCompare(b,'zh');
+    });
+    html=keys.map(k=>`<div class="group-title">📍 ${esc(k)} · ${groups[k].length} 本</div>`+groups[k].map(cardHTML).join('')).join('');
+  }else{
+    html=list.map(cardHTML).join('');
+  }
+  $('#bookGrid').innerHTML=html;
+  $$('#bookGrid .book-card').forEach(c=>c.onclick=()=>openDetail(c.dataset.id));
+}
+
+/* ================= 阅读页 ================= */
+function renderReadPage(){
+  const cnt={}, byDate={};
+  RECORDS.forEach(r=>{cnt[r.bookId]=(cnt[r.bookId]||0)+1;byDate[r.date]=(byDate[r.date]||0)+1});
+  $('#stTotal').textContent=BOOKS.length;
+  $('#stRead').textContent=RECORDS.length;
+  const ym=todayStr().slice(0,7);
+  $('#stMonth').textContent=RECORDS.filter(r=>r.date.startsWith(ym)).length;
+  // heatmap 近84天
+  const days=[];const now=new Date();
+  for(let i=83;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);days.push(d)}
+  const first=days[0].getDay();
+  let hm='';for(let i=0;i<first;i++)hm+='<div style="background:transparent"></div>';
+  days.forEach(d=>{
+    const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const n=byDate[ds]||0;
+    hm+=`<div class="${n>=3?'l3':n===2?'l2':n===1?'l1':''}" title="${ds}: ${n}次"></div>`;
+  });
+  $('#heatmap').innerHTML=hm;
+  // 排行
+  const rank=Object.entries(cnt).map(([id,n])=>({b:BOOKS.find(x=>x.id===id),n})).filter(x=>x.b).sort((a,b)=>b.n-a.n).slice(0,10);
+  $('#rankList').innerHTML=rank.length?rank.map((r,i)=>`<div class="rank-item"><span class="rk ${i<3?'top':''}">${i+1}</span><span class="rt">${esc(r.b.title)}</span><span class="rc">${r.n} 次</span></div>`).join(''):'<div style="font-size:13px;color:var(--sub)">还没有共读记录,快去记录吧~</div>';
+  // 今日
+  const t=todayStr();const tr=RECORDS.filter(r=>r.date===t);
+  $('#todayDate').textContent=t;
+  $('#todayBooks').innerHTML=tr.length?('今天读了 '+tr.map(r=>{const b=BOOKS.find(x=>x.id===r.bookId);return b?esc(b.title):''}).filter(Boolean).join('、')):'今天还没有共读记录哦';
+}
+
+/* ================= 详情 ================= */
+function openDetail(id){
+  const b=BOOKS.find(x=>x.id===id);if(!b)return;
+  currentDetail=b;
+  $('#dCover').innerHTML=b.cover?`<img src="${b.cover}">`:esc(b.title);
+  $('#dTitle').textContent=b.title;
+  $('#dAuthor').innerHTML=b.author?`✍️ <b>${esc(b.author)}</b>`:'';
+  $('#dIsbn').innerHTML=b.isbn?`🔗 ISBN: ${esc(b.isbn)}`:'';
+  $('#dAge').innerHTML=b.age?`👶 ${esc(b.age)}`:'';
+  $('#dLoc').innerHTML=b.location?`📍 <b>${esc(b.location)}</b>`:'📍 未设位置';
+  $('#dStatus').innerHTML=b.status==='stored'?`<span style="color:#78909c">📦 已收纳</span>`:`<span style="color:#2e7d32">📖 在架</span>`;
+  $('#dTags').innerHTML=(b.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  $('#dNote').textContent=b.note||'';
+  $('#btnToggleStatus').textContent=b.status==='stored'?'📖 重新上架':'📦 收纳起来';
+  const rd=$('#recordDate');rd.max=todayStr();rd.value=todayStr();
+  renderBookRecords(b.id);
+  show('detailModal');
+}
+function renderBookRecords(bookId){
+  const rs=RECORDS.filter(r=>r.bookId===bookId).sort((a,b)=>b.date.localeCompare(a.date));
+  $('#bookRecords').innerHTML=rs.length?rs.map(r=>`<div class="r-item"><span>${r.date}</span><span style="display:flex;align-items:center;gap:10px"><span style="color:#ffb300">${'★'.repeat(r.stars||0)}${'☆'.repeat(5-(r.stars||0))}</span><button class="r-del" data-id="${r.id}" title="删除这条记录">✕</button></span></div>`).join(''):'<div style="font-size:13px;color:var(--sub);padding:8px 0">暂无共读记录</div>';
+  $$('#bookRecords .r-del').forEach(b=>b.onclick=async()=>{
+    if(!confirm('删除这条共读记录?'))return;
+    await dbDel('records',b.dataset.id);
+    await loadAll();renderBookRecords(bookId);renderReadPage();
+    toast('已删除该条记录');
+  });
+}
+
+/* ================= 录入表单 ================= */
+function resetForm(){
+  editingId=null;tempTags=[];tempCover=null;pendingIsbn=null;
+  $('#mTitle').value='';$('#mAuthor').value='';$('#mNote').value='';$('#tagInput').value='';
+  $('#mCoverPreview').style.display='none';$('#mCoverFile').value='';
+  $('#lookupStatus').textContent='';
+  $('#fAge').value='';$('#fLocSel').value='';$('#fLocNew').style.display='none';$('#fLocNew').value='';
+  $('#fStatusSel').value='shelf';
+  $('#btnSave').textContent='💾 保存入库';
+  $('#addTitle').textContent='➕ 录入新书';
+  renderTagWrap();renderLocSel();stopScan();
+}
+function renderLocSel(preselect){
+  const locs=[...new Set(BOOKS.map(b=>b.location).filter(Boolean))];
+  $('#fLocSel').innerHTML='<option value="">不填</option><option value="__new">＋ 新建位置…</option>'+locs.map(l=>`<option ${l===preselect?'selected':''}>${esc(l)}</option>`).join('');
+}
+function renderTagWrap(){
+  $('#tagWrap').innerHTML=tempTags.map((t,i)=>`<span class="tag">${esc(t)}<span class="x" data-i="${i}">✕</span></span>`).join('');
+  $$('#tagWrap .x').forEach(x=>x.onclick=()=>{tempTags.splice(+x.dataset.i,1);renderTagWrap()});
+}
+function fillAgeQuick(){
+  $('#fAge').innerHTML='<option value="">请选择</option>'+AGE_OPTIONS.map(a=>`<option>${a}</option>`).join('');
+  $('#ageQuick').innerHTML='';
+  $('#tagQuick').innerHTML=QUICK_TAGS.map(t=>`<button data-t="${esc(t)}">${esc(t)}</button>`).join('');
+  $$('#tagQuick button').forEach(b=>b.onclick=()=>{
+    if(!tempTags.includes(b.dataset.t)){tempTags.push(b.dataset.t);renderTagWrap()}
+  });
+}
+function switchTab(tab){
+  $$('.tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  $('#tab-scan').style.display=tab==='scan'?'block':'none';
+  $('#tab-manual').style.display=tab==='manual'?'block':'none';
+  if(tab!=='scan')stopScan();
+}
+async function saveBookForm(){
+  const title=($('#mTitle').value||'').trim();
+  const age=$('#fAge').value;
+  if(!title){toast('请填写书名');return}
+  if(!age){toast('请选择适龄段');return}
+  let location=$('#fLocSel').value;
+  if(location==='__new'){
+    location=$('#fLocNew').value.trim();
+    if(!location){toast('请输入新位置名称');return}
+  }
+  if(location==='')location=null;
+  const book={
+    id:editingId||('b'+Date.now()+Math.random().toString(36).slice(2,6)),
+    title,author:($('#mAuthor').value||'').trim()||null,
+    isbn:pendingIsbn||(editingId?(BOOKS.find(b=>b.id===editingId)||{}).isbn:null),
+    cover:tempCover||(editingId?(BOOKS.find(b=>b.id===editingId)||{}).cover:null),
+    age,location,status:$('#fStatusSel').value,
+    tags:[...tempTags],note:($('#mNote').value||'').trim()||null,
+    createdAt:editingId?(BOOKS.find(b=>b.id===editingId)||{}).createdAt:Date.now()
+  };
+  await saveBook(book);
+  hide('addModal');
+  toast(editingId?'✅ 已更新':'🎉 入库成功!现在共有 '+BOOKS.length+' 本书');
+  render();
+}
+
+/* ================= 扫码 & 查书 ================= */
+let scanner=null,scanning=false;
+async function startScan(){
+  try{
+    scanner=new Html5Qrcode('reader');
+    await scanner.start({facingMode:'environment'},
+      {fps:10,qrbox:{width:260,height:160},formatsToSupport:undefined},
+      code=>onScanSuccess(code),()=>{});
+    scanning=true;
+    $('#scannerView').classList.add('show');
+    $('#btnStartScan').textContent='停止扫码';
+  }catch(e){
+    if(typeof Html5Qrcode==='undefined'){
+      toast('扫码组件加载失败(网络问题),可稍后重试或改用「手动录入」');
+    }else{
+      toast('无法打开摄像头,请检查权限设置(扫码需在 https 环境下使用)');
+    }
+  }
+}
+async function stopScan(){
+  if(scanner&&scanning){try{await scanner.stop();await scanner.clear()}catch(e){}}
+  scanning=false;scanner=null;
+  $('#scannerView').classList.remove('show');
+  $('#btnStartScan').textContent='开启摄像头扫码';
+}
+let lastScan=0;
+async function onScanSuccess(code){
+  const now=Date.now();
+  if(now-lastScan<2500)return; // 防连续触发
+  if(!/^\d{10,13}$/.test(code)){return}
+  lastScan=now;
+  try{if(scanner&&scanning){await scanner.pause(true)}}catch(e){}
+  pendingIsbn=code;
+  lookupBook(code);
+}
+async function lookupBook(isbn){
+  const st=$('#lookupStatus');
+  st.innerHTML='🔍 正在查询 ISBN '+esc(isbn)+' 的图书信息…';
+  let info=null;
+  // OpenLibrary
+  try{
+    const r=await fetch('https://openlibrary.org/isbn/'+isbn+'.json');
+    if(r.ok){
+      const d=await r.json();
+      let cover=null;
+      if(d.covers&&d.covers[0])cover='https://covers.openlibrary.org/b/id/'+d.covers[0]+'-M.jpg';
+      info={title:d.title,author:null,cover};
+      if(d.authors&&d.authors[0]){
+        try{
+          const ar=await fetch('https://openlibrary.org'+d.authors[0].key+'.json');
+          if(ar.ok)info.author=(await ar.json()).name;
+        }catch(e){}
+      }
+    }
+  }catch(e){}
+  // 谷歌图书(补充,中文书更友好)
+  if(!info||!info.title){
+    try{
+      const r=await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:'+isbn);
+      if(r.ok){
+        const d=await r.json();
+        if(d.items&&d.items[0]){
+          const v=d.items[0].volumeInfo;
+          info={title:v.title+(v.subtitle?' '+v.subtitle:''),author:(v.authors||[]).join(','),cover:(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail)||'').replace('http://','https://')};
+        }
+      }
+    }catch(e){}
+  }
+  switchTab('manual');
+  if(info&&info.title){
+    $('#mTitle').value=info.title;
+    $('#mAuthor').value=info.author||'';
+    if(info.cover){
+      tempCover=info.cover;
+      const img=new Image();
+      img.onload=()=>{const p=$('#mCoverPreview');p.src=info.cover;p.style.display='block'};
+      img.onerror=()=>{tempCover=null};
+      img.src=info.cover;
+    }
+    st.innerHTML='✅ 找到啦!已自动填好,请补充适龄段和位置。'+(tempCover?'':'<br>(没找到封面,可拍照补上)');
+  }else{
+    st.innerHTML='😅 没查到这本书(绘本常见),已记录 ISBN,请手动填写书名,也可以拍一张封面照片。';
+  }
+  toast('扫码成功,请补充信息');
+}
+
+/* ================= 封面拍照 ================= */
+function bindCoverFile(){
+  $('#mCoverFile').onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=()=>{
+      // 压缩到最大600px,避免占空间
+      const img=new Image();
+      img.onload=()=>{
+        const cv=document.createElement('canvas');
+        const sc=Math.min(1,600/Math.max(img.width,img.height));
+        cv.width=img.width*sc;cv.height=img.height*sc;
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        tempCover=cv.toDataURL('image/jpeg',.8);
+        const p=$('#mCoverPreview');p.src=tempCover;p.style.display='block';
+      };
+      img.src=rd.result;
+    };
+    rd.readAsDataURL(f);
+  };
+}
+
+/* ================= 备份 ================= */
+function exportBackup(){
+  const data={version:1,exportAt:new Date().toISOString(),books:BOOKS,records:RECORDS};
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='joyce书屋备份_'+todayStr()+'.json';
+  a.click();
+  toast('备份文件已导出,请保存好(如存到iCloud/微信)');
+}
+async function importBackup(file){
+  try{
+    const data=JSON.parse(await file.text());
+    if(!data.books)throw 0;
+    if(!confirm('将导入 '+data.books.length+' 本书和 '+(data.records||[]).length+' 条记录。是否覆盖现有全部数据?(建议先导出当前备份)'))return;
+    await dbClear('books');await dbClear('records');
+    for(const b of data.books)await dbPut('books',b);
+    for(const r of (data.records||[]))await dbPut('records',r);
+    await loadAll();render();hide('backupModal');
+    toast('✅ 恢复成功!共 '+BOOKS.length+' 本书');
+  }catch(e){toast('备份文件格式不对,导入失败')}
+}
+
+/* ================= 星星 ================= */
+let curStars=0;
+function renderStars(n){
+  curStars=n;
+  $('#starRow').innerHTML=[1,2,3,4,5].map(i=>`<button class="${i<=n?'on':''}" data-s="${i}">★</button>`).join('');
+  $$('#starRow button').forEach(b=>b.onclick=()=>renderStars(+b.dataset.s));
+}
+
+/* ================= 弹层 & 事件 ================= */
+function show(id){$('#'+id).classList.add('show')}
+function hide(id){$('#'+id).classList.remove('show')}
+function render(){renderHeader();renderChips();renderFilters();renderGrid();renderReadPage()}
+
+function bindEvents(){
+  // 导航
+  $$('nav button').forEach(b=>b.onclick=()=>{
+    $$('nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+    $('#page-shelf').style.display=b.dataset.page==='shelf'?'block':'none';
+    $('#page-read').style.display=b.dataset.page==='read'?'block':'none';
+    $('#fabAdd').style.display=b.dataset.page==='shelf'?'flex':'none';
+    window.scrollTo(0,0);
+  });
+  // 搜索
+  $('#searchInput').oninput=e=>{filter.q=e.target.value.trim();renderGrid()};
+  // 筛选
+  $('#btnFilter').onclick=()=>$('#filterPanel').classList.toggle('show');
+  $('#fLocation').onchange=e=>{filter.loc=e.target.value;render()};
+  $('#fStatus').onchange=e=>{filter.status=e.target.value;render()};
+  $('#fTag').onchange=e=>{filter.tag=e.target.value;render()};
+  $('#fGroup').onchange=e=>{filter.group=e.target.value;renderGrid()};
+  $('#fReset').onclick=()=>{filter={age:'',loc:'',status:'',tag:'',q:'',group:''};$('#searchInput').value='';render()};
+  // 录入
+  $('#fabAdd').onclick=()=>{resetForm();show('addModal')};
+  $$('.tabbar button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  $('#btnStartScan').onclick=()=>{scanning?stopScan():startScan()};
+  $('#btnSave').onclick=saveBookForm;
+  $('#fLocSel').onchange=e=>{$('#fLocNew').style.display=e.target.value==='__new'?'block':'none'};
+  $('#tagAdd').onclick=()=>{const v=$('#tagInput').value.trim();if(v&&!tempTags.includes(v)){tempTags.push(v);$('#tagInput').value='';renderTagWrap()}};
+  $('#tagInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#tagAdd').click()}};
+  // 关闭
+  $$('[data-close]').forEach(b=>b.onclick=()=>{hide(b.dataset.close);if(b.dataset.close==='addModal')stopScan()});
+  $$('.modal-mask').forEach(m=>m.onclick=e=>{if(e.target===m){m.classList.remove('show');if(m.id==='addModal')stopScan()}});
+  // 详情操作
+  $('#btnEditBook').onclick=()=>{
+    if(!currentDetail)return;
+    const b=currentDetail;editingId=b.id;tempTags=[...(b.tags||[])];tempCover=b.cover;pendingIsbn=b.isbn;
+    $('#mTitle').value=b.title||'';$('#mAuthor').value=b.author||'';$('#mNote').value=b.note||'';
+    if(b.cover){const p=$('#mCoverPreview');p.src=b.cover;p.style.display='block'}
+    $('#fAge').value=b.age||'';$('#fStatusSel').value=b.status||'shelf';
+    renderLocSel(b.location);$('#fLocNew').style.display='none';
+    $('#btnSave').textContent='💾 保存修改';$('#addTitle').textContent='✏️ 编辑书籍';
+    renderTagWrap();hide('detailModal');switchTab('manual');show('addModal');
+  };
+  $('#btnToggleStatus').onclick=async()=>{
+    if(!currentDetail)return;
+    currentDetail.status=currentDetail.status==='stored'?'shelf':'stored';
+    await saveBook(currentDetail);
+    toast(currentDetail.status==='stored'?'📦 已收纳入库':'📖 已重新上架');
+    openDetail(currentDetail.id);render();
+  };
+  $('#btnDelBook').onclick=async()=>{
+    if(!currentDetail)return;
+    if(!confirm('确定删除《'+currentDetail.title+'》吗?这本书的共读记录也会一并删除。'))return;
+    await dbDel('books',currentDetail.id);
+    for(const r of RECORDS.filter(r=>r.bookId===currentDetail.id))await dbDel('records',r.id);
+    await loadAll();hide('detailModal');render();toast('已删除');
+  };
+  // 星星评分 + 记录
+  renderStars(0);
+  $('#btnAddRecord').onclick=async()=>{
+    if(!currentDetail)return;
+    if(!curStars){toast('先点上面的星星打个分吧');return}
+    const d=$('#recordDate').value||todayStr();
+    await dbPut('records',{id:'r'+Date.now()+Math.random().toString(36).slice(2,5),bookId:currentDetail.id,date:d,stars:curStars});
+    await loadAll();renderBookRecords(currentDetail.id);renderReadPage();renderStars(0);
+    $('#recordDate').value=todayStr();
+    toast('⭐ 已记录 '+d+' 的共读!');
+  };
+  $('#btnLogToday').onclick=()=>{
+    if(BOOKS.length===0){toast('先去录几本书吧');return}
+    // 弹出选书:简单用搜索页,提示点书详情记录
+    $$('nav button')[0].click();
+    $('#searchInput').focus();
+    toast('点开书本 → 打星 → 「记录一次共读」');
+  };
+  // 备份
+  $('#btnMore').onclick=()=>show('backupModal');
+  $('#btnExport').onclick=exportBackup;
+  $('#btnImport').onclick=()=>$('#importFile').click();
+  $('#importFile').onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0])};
+}
+
+/* ================= 启动 ================= */
+(async function init(){
+  await openDB();
+  await loadAll();
+  fillAgeQuick();
+  bindEvents();
+  bindCoverFile();
+  render();
+})();
+</script>
+</body>
+</html>
