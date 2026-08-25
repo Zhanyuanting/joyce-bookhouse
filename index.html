@@ -110,8 +110,8 @@ nav button.on{color:var(--primary-dark);font-weight:600}
 
 /* ===== 阅读页 ===== */
 .page-title{font-size:16px;font-weight:700;padding:14px 16px 8px}
-.stat-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px 12px}
-.stat-c{background:#fff;border-radius:var(--radius);padding:14px 8px;text-align:center;box-shadow:var(--shadow)}
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 14px 12px}
+.stat-c{background:#fff;border-radius:var(--radius);padding:14px 4px;text-align:center;box-shadow:var(--shadow)}
 .stat-c .n{font-size:22px;font-weight:800;color:var(--primary-dark)}
 .stat-c .l{font-size:11px;color:var(--sub);margin-top:2px}
 #heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px 2px}
@@ -186,6 +186,7 @@ nav button.on{color:var(--primary-dark);font-weight:600}
     <div class="stat-c"><div class="n" id="stTotal">0</div><div class="l">总藏书</div></div>
     <div class="stat-c"><div class="n" id="stRead">0</div><div class="l">共读次数</div></div>
     <div class="stat-c"><div class="n" id="stMonth">0</div><div class="l">本月共读</div></div>
+    <div class="stat-c"><div class="n" id="stCost" style="font-size:17px">¥0</div><div class="l">累计购书</div></div>
   </div>
   <div class="section-box">
     <div style="font-size:13px;color:var(--sub);margin-bottom:6px">近 12 周共读热力图</div>
@@ -249,6 +250,16 @@ nav button.on{color:var(--primary-dark);font-weight:600}
         <option value="shelf">📖 在架(现在在读)</option>
         <option value="stored">📦 已收纳(暂时收起来)</option>
       </select>
+    </div>
+    <div class="f-row"><label>怎么来的</label>
+      <select id="fSource">
+        <option value="">不记录</option>
+        <option value="bought">💰 自己购买</option>
+        <option value="gift">🎁 别人送的</option>
+      </select>
+    </div>
+    <div class="f-row" id="priceRow" style="display:none"><label>购买价格(元)</label>
+      <input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="例如:25.8">
     </div>
     <div class="f-row"><label>主题标签</label>
       <div class="tag-input-row"><input id="tagInput" placeholder="输入标签后回车,或点下面的快捷标签"><button class="btn sm sec" id="tagAdd">添加</button></div>
@@ -415,6 +426,8 @@ function renderReadPage(){
   $('#stRead').textContent=RECORDS.length;
   const ym=todayStr().slice(0,7);
   $('#stMonth').textContent=RECORDS.filter(r=>r.date.startsWith(ym)).length;
+  const cost=BOOKS.reduce((s,b)=>s+(b.source==='bought'&&b.price>0?b.price:0),0);
+  $('#stCost').textContent='¥'+(cost%1?cost.toFixed(1):cost);
   // heatmap 近84天
   const days=[];const now=new Date();
   for(let i=83;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);days.push(d)}
@@ -446,6 +459,8 @@ function openDetail(id){
   $('#dAge').innerHTML=b.age?`👶 ${esc(b.age)}`:'';
   $('#dLoc').innerHTML=b.location?`📍 <b>${esc(b.location)}</b>`:'📍 未设位置';
   $('#dStatus').innerHTML=b.status==='stored'?`<span style="color:#78909c">📦 已收纳</span>`:`<span style="color:#2e7d32">📖 在架</span>`;
+  if(b.source==='bought')$('#dStatus').innerHTML+=` · 💰 <b>¥${b.price!=null?b.price:'?'}</b>`;
+  else if(b.source==='gift')$('#dStatus').innerHTML+=' · 🎁 别人送的';
   $('#dTags').innerHTML=(b.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('');
   $('#dNote').textContent=b.note||'';
   $('#btnToggleStatus').textContent=b.status==='stored'?'📖 重新上架':'📦 收纳起来';
@@ -472,6 +487,7 @@ function resetForm(){
   $('#lookupStatus').textContent='';
   $('#fAge').value='';$('#fLocSel').value='';$('#fLocNew').style.display='none';$('#fLocNew').value='';
   $('#fStatusSel').value='shelf';
+  $('#fSource').value='';$('#fPrice').value='';$('#priceRow').style.display='none';
   $('#btnSave').textContent='💾 保存入库';
   $('#addTitle').textContent='➕ 录入新书';
   renderTagWrap();renderLocSel();stopScan();
@@ -515,6 +531,8 @@ async function saveBookForm(){
     isbn:pendingIsbn||(editingId?(BOOKS.find(b=>b.id===editingId)||{}).isbn:null),
     cover:tempCover||(editingId?(BOOKS.find(b=>b.id===editingId)||{}).cover:null),
     age,location,status:$('#fStatusSel').value,
+    source:$('#fSource').value||null,
+    price:($('#fSource').value==='bought'&&$('#fPrice').value!=='')?parseFloat($('#fPrice').value):null,
     tags:[...tempTags],note:($('#mNote').value||'').trim()||null,
     createdAt:editingId?(BOOKS.find(b=>b.id===editingId)||{}).createdAt:Date.now()
   };
@@ -698,6 +716,7 @@ function bindEvents(){
   $('#btnStartScan').onclick=()=>{scanning?stopScan():startScan()};
   $('#btnSave').onclick=saveBookForm;
   $('#fLocSel').onchange=e=>{$('#fLocNew').style.display=e.target.value==='__new'?'block':'none'};
+  $('#fSource').onchange=e=>{$('#priceRow').style.display=e.target.value==='bought'?'block':'none'};
   $('#tagAdd').onclick=()=>{const v=$('#tagInput').value.trim();if(v&&!tempTags.includes(v)){tempTags.push(v);$('#tagInput').value='';renderTagWrap()}};
   $('#tagInput').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('#tagAdd').click()}};
   // 关闭
@@ -710,6 +729,8 @@ function bindEvents(){
     $('#mTitle').value=b.title||'';$('#mAuthor').value=b.author||'';$('#mNote').value=b.note||'';
     if(b.cover){const p=$('#mCoverPreview');p.src=b.cover;p.style.display='block'}
     $('#fAge').value=b.age||'';$('#fStatusSel').value=b.status||'shelf';
+    $('#fSource').value=b.source||'';$('#fPrice').value=b.price!=null?b.price:'';
+    $('#priceRow').style.display=b.source==='bought'?'block':'none';
     renderLocSel(b.location);$('#fLocNew').style.display='none';
     $('#btnSave').textContent='💾 保存修改';$('#addTitle').textContent='✏️ 编辑书籍';
     renderTagWrap();hide('detailModal');switchTab('manual');show('addModal');
