@@ -88,7 +88,8 @@ nav button.on{color:var(--primary-dark);font-weight:600}
 /* ===== 扫码 ===== */
 #scannerView{display:none;background:#000;border-radius:14px;overflow:hidden;margin-bottom:12px}
 #scannerView.show{display:block}
-#reader{width:100%}
+#reader{width:100%;min-height:220px}
+#reader video{width:100% !important;height:auto !important;object-fit:cover;display:block}
 .scan-actions{display:flex;gap:10px;margin-bottom:12px}
 .scan-actions .btn{flex:1;margin-top:0}
 #lookupStatus{font-size:13px;color:var(--sub);padding:8px 0;min-height:20px}
