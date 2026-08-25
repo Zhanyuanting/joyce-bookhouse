@@ -526,6 +526,15 @@ async function saveBookForm(){
 /* ================= 扫码 & 查书 ================= */
 let scanner=null,scanning=false;
 async function startScan(){
+  if(typeof Html5Qrcode==='undefined'){
+    $('#lookupStatus').innerHTML='⚠️ 扫码组件还没加载好(网络较慢),等几秒再点试试;或直接用「手动录入」。';
+    return;
+  }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    $('#lookupStatus').innerHTML='⚠️ 当前环境不支持摄像头。请确认是用 <b>https</b> 网页打开(链接开头是 https://),不要用微信等内置浏览器,建议用 Safari 或 Chrome 打开。';
+    return;
+  }
+  $('#lookupStatus').textContent='🎥 正在启动摄像头,如浏览器弹出「允许访问摄像头」请点允许…';
   try{
     scanner=new Html5Qrcode('reader');
     await scanner.start({facingMode:'environment'},
@@ -534,12 +543,9 @@ async function startScan(){
     scanning=true;
     $('#scannerView').classList.add('show');
     $('#btnStartScan').textContent='停止扫码';
+    $('#lookupStatus').textContent='';
   }catch(e){
-    if(typeof Html5Qrcode==='undefined'){
-      toast('扫码组件加载失败(网络问题),可稍后重试或改用「手动录入」');
-    }else{
-      toast('无法打开摄像头,请检查权限设置(扫码需在 https 环境下使用)');
-    }
+    $('#lookupStatus').innerHTML='⚠️ 摄像头打开失败。常见原因:<br>1. 浏览器询问权限时点了「不允许」→ 去浏览器设置里重置该网页的相机权限<br>2. 用了微信内置浏览器 → 请用 Safari/Chrome 打开本页<br>3. 其他 App 正在占用摄像头';
   }
 }
 async function stopScan(){
