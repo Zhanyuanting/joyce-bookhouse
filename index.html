@@ -224,6 +224,10 @@ nav button.on{color:var(--primary-dark);font-weight:600}
         ⚠️ 摄像头需要在 https 网页或本地服务下才能打开;直接双击打开本地文件可能无法扫码。
       </div>
       <div id="lookupStatus"></div>
+      <div class="tag-input-row" style="margin-top:10px">
+        <input id="manualIsbn" inputmode="numeric" placeholder="扫不出?手动输入条码下的数字">
+        <button class="btn sm sec" id="btnManualIsbn">查询</button>
+      </div>
     </div>
     <div id="tab-manual" style="display:none">
       <div class="f-row"><label>书名 *</label><input id="mTitle" placeholder="例如:好饿的毛毛虫"></div>
@@ -557,7 +561,7 @@ async function startScan(){
   try{
     scanner=new Html5Qrcode('reader');
     await scanner.start({facingMode:'environment'},
-      {fps:10,qrbox:{width:260,height:160},formatsToSupport:undefined},
+      {fps:10,qrbox:{width:300,height:180},aspectRatio:1.777,videoConstraints:{width:{ideal:1920},height:{ideal:1080},facingMode:'environment'}},
       code=>onScanSuccess(code),()=>{});
     scanning=true;
     $('#scannerView').classList.add('show');
@@ -714,6 +718,11 @@ function bindEvents(){
   $('#fabAdd').onclick=()=>{resetForm();show('addModal')};
   $$('.tabbar button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   $('#btnStartScan').onclick=()=>{scanning?stopScan():startScan()};
+  $('#btnManualIsbn').onclick=()=>{
+    const code=$('#manualIsbn').value.replace(/[^0-9]/g,'');
+    if(!/^\d{10,13}$/.test(code)){toast('请输入条码下方的 10~13 位数字');return}
+    stopScan();pendingIsbn=code;lookupBook(code);
+  };
   $('#btnSave').onclick=saveBookForm;
   $('#fLocSel').onchange=e=>{$('#fLocNew').style.display=e.target.value==='__new'?'block':'none'};
   $('#fSource').onchange=e=>{$('#priceRow').style.display=e.target.value==='bought'?'block':'none'};
