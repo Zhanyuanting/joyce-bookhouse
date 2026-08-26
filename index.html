@@ -218,6 +218,9 @@ nav button.on{color:var(--primary-dark);font-weight:600}
       <div class="scan-actions">
         <button class="btn" id="btnStartScan">开启摄像头扫码</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer">
+        <input type="checkbox" id="batchMode" style="width:18px;height:18px"> ⚡ 连续扫码模式(扫到即入库,稍后补详情)
+      </label>
       <div style="font-size:12px;color:var(--sub);line-height:1.7;padding:4px 2px">
         💡 扫书背面的 ISBN 条码(13位数字那串)。识别成功后会自动查询书名和封面。
         没有条码的中文绘本/套装,请用「手动录入」。<br>
@@ -227,6 +230,10 @@ nav button.on{color:var(--primary-dark);font-weight:600}
       <div class="tag-input-row" style="margin-top:10px">
         <input id="manualIsbn" inputmode="numeric" placeholder="扫不出?手动输入条码下的数字">
         <button class="btn sm sec" id="btnManualIsbn">查询</button>
+      </div>
+      <div class="f-row" style="margin-top:14px"><label>📦 批量导入(每行一个条码号,可从Excel整列复制)</label>
+        <textarea id="batchIsbn" rows="3" placeholder="9787523706855&#10;9787111558422&#10;..."></textarea>
+        <button class="btn sec" id="btnBatchImport" style="margin-top:8px">📦 批量入库</button>
       </div>
     </div>
     <div id="tab-manual" style="display:none">
@@ -575,7 +582,7 @@ async function startScan(){
   try{
     scanner=new Html5Qrcode('reader');
     await scanner.start({facingMode:'environment'},
-      {fps:10,qrbox:{width:300,height:180},aspectRatio:1.777,videoConstraints:{width:{ideal:1920},height:{ideal:1080},facingMode:'environment'}},
+      {fps:10,qrbox:{width:300,height:180},aspectRatio:1.777,useBarCodeDetectorIfSupported:true,videoConstraints:{width:{ideal:1920},height:{ideal:1080},facingMode:'environment'}},
       code=>onScanSuccess(code),()=>{});
     scanning=true;
     $('#scannerView').classList.add('show');
@@ -594,12 +601,43 @@ async function stopScan(){
 let lastScan=0;
 async function onScanSuccess(code){
   const now=Date.now();
-  if(now-lastScan<2500)return; // 防连续触发
+  if(now-lastScan<2000)return; // 防连续触发
   if(!/^\d{10,13}$/.test(code)){return}
   lastScan=now;
+  // ⚡ 连续扫码模式:扫到即入库,不停表单
+  if($('#batchMode').checked){
+    const dup=BOOKS.find(b=>b.isbn===code);
+    if(dup){toast('⚠️ 这本已经录过了');if(navigator.vibrate)navigator.vibrate([60,60,60]);return}
+    const b={id:'b'+code,title:'未整理 · '+code,isbn:code,author:null,cover:null,age:null,location:null,status:'shelf',tags:[],note:null,createdAt:Date.now()};
+    await saveBook(b);
+    if(navigator.vibrate)navigator.vibrate(80);
+    toast('✅ 已入库,共 '+BOOKS.length+' 本 · 继续扫!');
+    render();
+    quietLookup(code,b.id); // 后台尝试补书名,不影响继续扫
+    return;
+  }
   try{if(scanner&&scanning){await scanner.pause(true)}}catch(e){}
   pendingIsbn=code;
   lookupBook(code);
+}
+async function quietLookup(isbn,bookId){
+  let info=null;
+  try{
+    const r=await fetch('https://openlibrary.org/isbn/'+isbn+'.json');
+    if(r.ok){const d=await r.json();info={title:d.title,cover:d.covers&&d.covers[0]?'https://covers.openlibrary.org/b/id/'+d.covers[0]+'-M.jpg':null}}
+  }catch(e){}
+  if(!info){
+    try{
+      const r=await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:'+isbn);
+      if(r.ok){const d=await r.json();if(d.items&&d.items[0]){const v=d.items[0].volumeInfo;
+        info={title:v.title,author:(v.authors||[]).join(','),cover:(v.imageLinks&&(v.imageLinks.thumbnail||v.imageLinks.smallThumbnail)||'').replace('http://','https://')}}
+    }}catch(e){}
+  }
+  if(info&&info.title){
+    const b=BOOKS.find(x=>x.id===bookId);
+    if(b){b.title=info.title;if(info.author)b.author=info.author;if(info.cover)b.cover=info.cover;
+      await saveBook(b);render();toast('📖 已自动补全书名:《'+info.title.slice(0,12)+'…》')}
+  }
 }
 async function lookupBook(isbn){
   const st=$('#lookupStatus');
@@ -794,6 +832,20 @@ function bindEvents(){
     const code=$('#manualIsbn').value.replace(/[^0-9]/g,'');
     if(!/^\d{10,13}$/.test(code)){toast('请输入条码下方的 10~13 位数字');return}
     stopScan();pendingIsbn=code;lookupBook(code);
+  };
+  $('#btnBatchImport').onclick=async()=>{
+    const lines=$('#batchIsbn').value.split(/[\s,;，；]+/).map(s=>s.replace(/[^0-9]/g,'')).filter(s=>/^\d{10,13}$/.test(s));
+    if(!lines.length){toast('没有识别到有效的条码号(10~13位数字)');return}
+    const uniq=[...new Set(lines)];
+    let added=0,skip=0;
+    for(const code of uniq){
+      if(BOOKS.find(b=>b.isbn===code)){skip++;continue}
+      await saveBook({id:'b'+code,title:'未整理 · '+code,isbn:code,author:null,cover:null,age:null,location:null,status:'shelf',tags:[],note:null,createdAt:Date.now()});
+      added++;
+    }
+    $('#batchIsbn').value='';
+    hide('addModal');render();
+    toast('📦 批量入库 '+added+' 本'+(skip?'(跳过已存在 '+skip+' 本)':''));
   };
   $('#btnSave').onclick=saveBookForm;
   $('#fLocSel').onchange=e=>{$('#fLocNew').style.display=e.target.value==='__new'?'block':'none'};
