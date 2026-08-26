@@ -217,7 +217,9 @@ nav button.on{color:var(--primary-dark);font-weight:600}
       <div id="scannerView"><div id="reader"></div></div>
       <div class="scan-actions">
         <button class="btn" id="btnStartScan">开启摄像头扫码</button>
+        <button class="btn sec" id="btnPhotoScan">📸 拍照识别</button>
       </div>
+      <input type="file" id="photoScanFile" accept="image/*" capture="environment" style="display:none">
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer">
         <input type="checkbox" id="batchMode" style="width:18px;height:18px"> ⚡ 连续扫码模式(扫到即入库,稍后补详情)
       </label>
@@ -828,6 +830,19 @@ function bindEvents(){
   $('#fabAdd').onclick=()=>{resetForm();show('addModal')};
   $$('.tabbar button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
   $('#btnStartScan').onclick=()=>{scanning?stopScan():startScan()};
+  $('#btnPhotoScan').onclick=()=>{stopScan();$('#photoScanFile').click()};
+  $('#photoScanFile').onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    $('#lookupStatus').textContent='🔍 正在从照片识别条码…';
+    try{
+      const h=new Html5Qrcode('reader');
+      const code=await h.scanFile(f,false);
+      await onScanSuccess(code);
+    }catch(err){
+      $('#lookupStatus').textContent='😅 照片里没认出条码。拍照时让条码占满画面、光线充足、正对着拍,再试一次';
+    }
+    e.target.value='';
+  };
   $('#btnManualIsbn').onclick=()=>{
     const code=$('#manualIsbn').value.replace(/[^0-9]/g,'');
     if(!/^\d{10,13}$/.test(code)){toast('请输入条码下方的 10~13 位数字');return}
