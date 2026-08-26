@@ -370,7 +370,9 @@ function dbClear(store){return new Promise(res=>{tx(store,'readwrite').clear().o
 let BOOKS=[], RECORDS=[];
 let filter={age:'',loc:'',status:'',tag:'',q:'',group:''};
 let editingId=null, currentDetail=null, tempTags=[], tempCover=null, pendingIsbn=null;
-const AGE_OPTIONS=['6个月+','1岁+','1.5岁+','2岁+','2.5岁+','3岁+','3.5岁+','4岁+','5岁+','成人'];
+const AGE_OPTIONS=['0-3岁','3-6岁','6-9岁','9-12岁','12岁+','成人'];
+const AGE_ORDER={};AGE_OPTIONS.forEach((a,i)=>AGE_ORDER[a]=i);
+const AGE_MIGRATE={'6个月+':'0-3岁','1岁+':'0-3岁','1.5岁+':'0-3岁','2岁+':'0-3岁','2.5岁+':'0-3岁','3岁+':'3-6岁','3.5岁+':'3-6岁','4岁+':'3-6岁','5岁+':'3-6岁','成人':'成人'};
 const QUICK_TAGS=['中文','英文','双语','科普','恐龙','动物','公主','车车','情绪管理','生活习惯','故事','贴纸书','触摸书','机关书','套装','点读书'];
 
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
@@ -387,7 +389,8 @@ function renderHeader(){
   $('#headerStats').textContent=`共 ${BOOKS.length} 本 · 在架 ${on} · 收纳 ${st}`;
 }
 function renderChips(){
-  const ages=[...new Set(BOOKS.map(b=>b.age).filter(Boolean))];
+  const ages=[...new Set(BOOKS.map(b=>b.age).filter(Boolean))]
+    .sort((a,b)=>((AGE_ORDER[a]??99)-(AGE_ORDER[b]??99))||a.localeCompare(b,'zh'));
   const chips=['全部',...ages];
   $('#ageChips').innerHTML=chips.map(c=>`<button class="chip ${filter.age===(c==='全部'?'':c)?'on':''}" data-age="${esc(c==='全部'?'':c)}">${esc(c)}</button>`).join('');
   $$('#ageChips .chip').forEach(b=>b.onclick=()=>{filter.age=b.dataset.age;render()});
@@ -932,9 +935,18 @@ function bindEvents(){
 }
 
 /* ================= 启动 ================= */
+async function migrateAges(){
+  let changed=false;
+  for(const b of BOOKS){
+    const na=AGE_MIGRATE[b.age];
+    if(na&&na!==b.age){b.age=na;await dbPut('books',b);changed=true}
+  }
+  if(changed)await loadAll();
+}
 (async function init(){
   await openDB();
   await loadAll();
+  await migrateAges();
   fillAgeQuick();
   bindEvents();
   bindCoverFile();
