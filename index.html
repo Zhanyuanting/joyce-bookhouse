@@ -310,10 +310,24 @@ nav button.on{color:var(--primary-dark);font-weight:600}
   <div class="modal">
     <div class="m-head"><h2>💾 备份与恢复</h2><button class="close" data-close="backupModal">✕</button></div>
     <div style="font-size:13px;color:var(--sub);line-height:1.8;margin-bottom:14px">
-      数据都保存在这台设备的浏览器里。建议每月导出一次备份文件(JSON),换手机或误删时可以恢复。
+      数据保存在这台设备的浏览器里,误删图标/清缓存会丢失。强烈建议开启☁️云备份(存在你自己的 GitHub 私有仓库,免费)。
     </div>
+    <div class="page-title" style="padding:0 0 8px;font-size:15px">☁️ 云备份(推荐)</div>
+    <div class="f-row"><label>GitHub Token(一次性设置)</label>
+      <input id="ghToken" type="password" placeholder="粘贴 ghToken,勾选 repo 权限">
+      <div style="font-size:12px;color:var(--sub);margin-top:5px;line-height:1.6">
+        没有Token?电脑打开 <b>github.com/settings/tokens</b> → Generate new token(classic) → 勾选 <b>repo</b> → 生成后复制粘贴到这里。
+      </div>
+    </div>
+    <button class="btn sec" id="btnSaveToken">保存 Token</button>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <button class="btn" id="btnCloudSave" style="flex:1">☁️ 备份到云端</button>
+      <button class="btn sec" id="btnCloudRestore" style="flex:1">☁️ 从云端恢复</button>
+    </div>
+    <div id="cloudStatus" style="font-size:13px;color:var(--sub);padding:8px 0;min-height:18px"></div>
+    <div class="page-title" style="padding:8px 0 8px;font-size:15px">📁 本地备份(导出文件)</div>
     <button class="btn" id="btnExport">📤 导出备份文件</button>
-    <button class="btn sec" id="btnImport">📥 从备份恢复</button>
+    <button class="btn sec" id="btnImport" style="margin-top:10px">📥 从备份恢复</button>
     <input type="file" id="importFile" accept=".json" style="display:none">
   </div>
 </div>
@@ -660,6 +674,64 @@ function bindCoverFile(){
   };
 }
 
+/* ================= 云备份(GitHub) ================= */
+const GH_KEY='ghToken', GH_REPO='joyce-backup';
+function ghH(json){const h={Authorization:'token '+localStorage.getItem(GH_KEY),Accept:'application/vnd.github+json'};if(json)h['Content-Type']='application/json';return h}
+function ghStatus(m){$('#cloudStatus').textContent=m}
+async function ghUser(){
+  const r=await fetch('https://api.github.com/user',{headers:ghH()});
+  if(!r.ok)throw new Error('token');
+  return r.json();
+}
+async function cloudSave(){
+  try{
+    ghStatus('☁️ 正在上传备份…');
+    const user=await ghUser();
+    let chk=await fetch(`https://api.github.com/repos/${user.login}/${GH_REPO}`,{headers:ghH()});
+    if(chk.status===404){
+      await fetch('https://api.github.com/user/repos',{method:'POST',headers:ghH(1),body:JSON.stringify({name:GH_REPO,private:true,description:"Joyce's 书屋自动备份"})});
+    }
+    const path=`https://api.github.com/repos/${user.login}/${GH_REPO}/contents/books.json`;
+    let sha=null;
+    const g=await fetch(path,{headers:ghH()});
+    if(g.ok)sha=(await g.json()).sha;
+    const data={version:1,exportAt:new Date().toISOString(),books:BOOKS,records:RECORDS};
+    const b64=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const r=await fetch(path,{method:'PUT',headers:ghH(1),body:JSON.stringify({message:'书屋备份 '+todayStr(),content:b64,sha:sha||undefined})});
+    if(!r.ok)throw new Error('save');
+    ghStatus('✅ 云备份成功 '+BOOKS.length+' 本书 · '+RECORDS.length+' 条记录');
+  }catch(e){
+    ghStatus('⚠️ 备份失败:'+(e.message==='token'?'Token 无效,请重新生成并勾选 repo 权限':'网络或权限问题,请重试'));
+  }
+}
+async function cloudRestore(){
+  try{
+    ghStatus('☁️ 正在从云端下载…');
+    const user=await ghUser();
+    const r=await fetch(`https://api.github.com/repos/${user.login}/${GH_REPO}/contents/books.json`,{headers:ghH()});
+    if(!r.ok){ghStatus('云端还没有备份(或仓库不存在),先点「备份到云端」');return}
+    const j=await r.json();
+    const txt=decodeURIComponent(escape(atob((j.content||'').replace(/\s/g,''))));
+    const data=JSON.parse(txt);
+    if(!data.books)throw 0;
+    if(!confirm('将从云端恢复 '+data.books.length+' 本书和 '+(data.records||[]).length+' 条记录,覆盖本机现有数据。继续?')){ghStatus('已取消');return}
+    await dbClear('books');await dbClear('records');
+    for(const b of data.books)await dbPut('books',b);
+    for(const rr of (data.records||[]))await dbPut('records',rr);
+    await loadAll();render();hide('backupModal');
+    toast('✅ 已从云端恢复 '+BOOKS.length+' 本书');
+  }catch(e){
+    ghStatus('⚠️ 恢复失败:'+(e.message==='token'?'Token 无效':'云端数据异常或网络问题'));
+  }
+}
+async function refreshCloudStatus(){
+  if(!localStorage.getItem(GH_KEY)){ghStatus('未设置 Token,云备份未开启');return}
+  try{
+    const u=await ghUser();
+    ghStatus('✅ 已连接 GitHub: '+u.login+'(私有仓库 '+GH_REPO+')');
+  }catch(e){ghStatus('⚠️ Token 已失效,请重新生成')}
+}
+
 /* ================= 备份 ================= */
 function exportBackup(){
   const data={version:1,exportAt:new Date().toISOString(),books:BOOKS,records:RECORDS};
@@ -777,10 +849,19 @@ function bindEvents(){
     toast('点开书本 → 打星 → 「记录一次共读」');
   };
   // 备份
-  $('#btnMore').onclick=()=>show('backupModal');
+  $('#btnMore').onclick=()=>{show('backupModal');refreshCloudStatus()};
   $('#btnExport').onclick=exportBackup;
   $('#btnImport').onclick=()=>$('#importFile').click();
   $('#importFile').onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0])};
+  $('#btnSaveToken').onclick=()=>{
+    const t=$('#ghToken').value.trim();
+    if(!t){toast('请先粘贴 Token');return}
+    localStorage.setItem(GH_KEY,t);
+    toast('已保存');
+    refreshCloudStatus();
+  };
+  $('#btnCloudSave').onclick=cloudSave;
+  $('#btnCloudRestore').onclick=cloudRestore;
 }
 
 /* ================= 启动 ================= */
